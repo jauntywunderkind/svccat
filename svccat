@@ -1,0 +1,25 @@
+#!/bin/bash
+set -x
+
+# find the active state for this service, in system
+u="--unit"
+unit="$1"
+shift
+state="$(systemctl status $unit 2>/dev/null | grep Active:)"
+if [ "$?" -ne 0 ]
+then
+	# failed, find the active state for this service, in user
+	u="--user-unit"
+	state="$(systemctl status --user $unit 2>/dev/null | grep Active:)"
+	if [ "$?" -ne 0 ]
+	then
+		# failed failed
+		echo "could not find $unit" 1>&2
+		exit 1
+	fi
+fi
+# extract the second when this program started
+since="$(echo "$state" | awk '{print $6,$7}')"
+
+# get all logs since that second
+journalctl -q -o cat "$u=$unit" --since "$since" $* | sed -e "1,/Started $1./ d"
